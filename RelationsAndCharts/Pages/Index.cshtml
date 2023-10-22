@@ -1,0 +1,94 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Visualization Page"; 
+}    
+ <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+ <script type="text/javascript"> 
+
+
+      document.addEventListener("DOMContentLoaded", () => { 
+          var top10_set = {};
+          @foreach (var el in Model.UserLogsSummedSet)
+          { 
+              @:top10_set[@(el.total_hours_worked)] = 2; 
+              //@:top10_set[@(el.user_id)] = @(el.total_hours_worked); 
+          }   
+          //drawChart();
+      })
+      //google.charts.load('current', {'packages':['bar']});
+      //google.charts.setOnLoadCallback(drawChart);
+
+      //function drawChart() {
+      //      console.log(top10_set);
+      //      var data = google.visualization.arrayToDataTable([
+      //        ['Year', 'My Now', 'Work', 'Free Time'],
+      //        ['2014', 1000, 400, 200],
+      //        ['2015', 1170, 460, 250],
+      //        ['2016', 660, 1120, 300],
+      //        ['2017', 1030, 540, 350]
+      //      ]);
+
+      //      var options = {
+      //        chart: {
+      //          title: 'Top 10 User Logs', 
+      //        },
+      //        bars: 'vertical' // Required for Material Bar Charts.
+      //      };
+
+      //      var chart = new google.charts.Bar(document.getElementById('top10_chart'));
+      //      chart.draw(data, google.charts.Bar.convertOptions(options));
+      //}
+
+    </script>
+<table>
+    <thead>
+        <tr> 
+            <th>First Name</th>
+            <th>Last Name</th>
+            <th>Email</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var user in Model.UsersSet)
+        {
+                    <tr> 
+                        <td>@user.first_name</td>
+                        <td>@user.last_name</td>
+                        <td>@user.email</td>
+                    </tr>
+        }
+    </tbody>
+</table> 
+<form method="post">
+    <input type="radio" 
+        asp-for="IsTop10Summed"
+        value="true"
+        name="IsTop10Summed" />
+        Show Summary  <br>
+    <input type="radio"  
+        asp-for="IsTop10Summed"
+        value="false"
+        name="IsTop10Summed" />
+        Show Per Project 
+</form>
+@if (Model.IsTop10Summed)
+{
+        <p> summed </p>
+}
+else
+{ 
+        <p> total </p>
+}
+
+<div id="top10_chart" style="align: center; width: 700px; height: 300px;"></div>
+
+<form method="post" asp-page-handler="RenegerateTables">
+    <button type="submit">Regenerate</button>
+</form> 
+<form method="post" asp-page-handler="PreviousPage">
+    <button type="submit">PreviousPage</button>
+</form> 
+<form method="post" asp-page-handler="NextPage">
+    <button type="submit">NextPage</button>
+</form> 
