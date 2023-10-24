@@ -142,10 +142,6 @@
     }
 
     function displayTop10Overview() {
-        console.log([
-            all_users.find(user => user.id == comparisonTotal.userId)?.email,
-            ...projects.map((project_el) => comparisonTotal.projectLogsSummed[project_el.id])
-        ])
         var data = google.visualization.arrayToDataTable(
             comparisonTotal.userId != null ?
                 [
@@ -196,6 +192,8 @@
     document.addEventListener("click", (el) => {
         if (el.target.parentNode.id == 'table_row') {
             var index = el.target.parentNode.classList[1].slice(6);
+            localStorage.setItem("date_start", "");
+            localStorage.setItem("date_end", "");
             window.location.href = `@(Url.Page("/"))/?handler=Compare&index=${index}`;
         }
     })
