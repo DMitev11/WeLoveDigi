@@ -9,54 +9,52 @@ public class UserEntity
 {
     [Key]
     public Guid id { get; set; } // Represents the uniqueidentifier field
+
+    [AllowNull]
     public string first_name { get; set; } // Represents the char(255) field
+    [AllowNull]
     public string last_name { get; set; } // Represents the char(255) field
+    [AllowNull]
     public string email { get; set; } // Represents the nchar(255) field
 }
 
 public class ProjectEntity
 {
-    [Key] 
+    [Key]
     public Guid id { get; set; } // Represents the uniqueidentifier field
+    [AllowNull]
     public string name { get; set; } // Represents the char(255) field
-}
-
-[Keyless] 
-public class UserLogsSummedEntity
-{
-    public Guid user_id { get; set; } 
-    public double total_hours_worked { get; set; } 
 }
 
 public class UserLogEntity
 {
-    [Key] 
-    public Guid id { get; set; } 
-    public Guid user_id { get; set; } 
-    public Guid project_id { get; set; }  
-    public double hours_worked { get; set; }  
-    public DateTime date { get; set; }
-} 
-
-public class UserLogTotalEntity
-{ 
+    [Key]
+    public Guid id { get; set; }
     public Guid user_id { get; set; }
-
-    [AllowNull]
-    public Dictionary<Guid, List<UserLogEntity>> project_logs { get; set; }
-    [AllowNull]
-    public Dictionary<Guid, double> project_logs_summed { get; set; }
+    public Guid project_id { get; set; }
+    public double hours_worked { get; set; }
+    public DateTime date { get; set; }
 }
+
+
+[Keyless]
+public class UserLogsSummedEntity
+{
+    public Guid user_id { get; set; }
+    public double total_hours_worked { get; set; }
+}
+
 #endregion
 
 public class DatabaseModelsContext : DbContext
 {
+    public DatabaseModelsContext(DbContextOptions<DatabaseModelsContext> options) : base(options) { }
+
     #region data_sets
-    private DbSet<ProjectEntity> ProjectsSet { get; set; }
     private DbSet<UserEntity> UsersSet { get; set; }
-    private DbSet<UserLogsSummedEntity> Top10UserLogsSummed { get; set; }
+    private DbSet<ProjectEntity> ProjectsSet { get; set; }
     private DbSet<UserLogEntity> UserLogsSet { get; set; }
-    private DatabaseModelsContext(DbContextOptions<DatabaseModelsContext> options) : base(options) { }
+    private DbSet<UserLogsSummedEntity> Top10UserLogsSummed { get; set; }
     #endregion
 
     #region getters
@@ -69,10 +67,20 @@ public class DatabaseModelsContext : DbContext
                 new SqlParameter("@quantity", quantity)}).ToList();
     }
 
+    public UserEntity GetUser(string userId)
+    {
+        // Use FromSqlRaw to call the stored function
+        return UsersSet.FromSqlRaw("SELECT * FROM Users WHERE id = @user_id",
+            new[] {
+                new SqlParameter("@user_id", userId)
+            }).ToList()[0];
+    }
+
     public async Task<bool> ResetDB()
     {
-        try { await Database.ExecuteSqlRawAsync("EXEC RecreateDB"); }
-        catch (Exception e) {
+        try { await Database.ExecuteSqlRawAsync("EXEC ResetDB"); }
+        catch (Exception e)
+        {
             Console.WriteLine(e);
             return false;
         }
@@ -87,8 +95,36 @@ public class DatabaseModelsContext : DbContext
                   "GROUP BY user_id " +
                   "ORDER BY total_hours_worked DESC;")
                   .ToList();
+        return list;
+    }
+
+    public List<UserLogsSummedEntity> GetTop10UserLogs(DateTime start, DateTime end)
+    {
+        var list = Top10UserLogsSummed.FromSqlRaw(
+                  "SELECT TOP 10 user_id, SUM(hours_worked) AS total_hours_worked " +
+                  "FROM TimeLogs " +
+                  "WHERE date >=  @start AND date <= @end " +
+                  "GROUP BY user_id " +
+                  "ORDER BY total_hours_worked DESC;",
+            new[] {
+                new SqlParameter("@start", String.Format("{0:d}", start)),
+                new SqlParameter("@end", String.Format("{0:d}", end))})
+                  .ToList();
 
         return list;
+    }
+
+    public UserLogsSummedEntity GetUserLogsSummed(string userId)
+    {
+        return Top10UserLogsSummed.FromSqlRaw(
+                  "SELECT user_id, SUM(hours_worked) AS total_hours_worked " +
+                  "FROM TimeLogs " +
+                  "WHERE user_id = @userId " +
+                  "GROUP BY user_id " +
+                  "ORDER BY total_hours_worked DESC; ",
+                  new[] {
+                    new SqlParameter("@userId", userId)
+                 }).ToList()[0];
     }
 
     public List<UserLogEntity> GetUserLogs(string userId)
@@ -98,47 +134,6 @@ public class DatabaseModelsContext : DbContext
                 "FROM TimeLogs " +
                 "WHERE user_id = @userId",
                new[] { new SqlParameter("@userId", userId) }).ToList();
-    }
-    public List<UserLogTotalEntity> GetTop10UserLogsDetailed()
-    {
-        List<UserLogTotalEntity> users_logs_total = new List<UserLogTotalEntity>();
-
-        List<UserLogsSummedEntity> topLogs = TopUserLogsTotal.FromSqlRaw(
-                  "SELECT TOP 10 user_id, SUM(hours_worked) AS total_hours_worked " +
-                  "FROM TimeLogs " +
-                  "GROUP BY user_id " +
-                  "ORDER BY total_hours_worked DESC;")
-                  .ToList(); 
-
-        for(int i = 0; i < topLogs.Count; i++)
-        {
-            UserLogsSummedEntity topLog = topLogs[i];
-            UserLogTotalEntity user_total = new UserLogTotalEntity
-            { 
-                user_id = topLog.user_id,
-                project_logs = new Dictionary<Guid, List<UserLogEntity>>(),
-                project_logs_summed = new Dictionary<Guid, double>() 
-            };
-
-            List<UserLogEntity> all_logs = 
-
-            all_logs.ForEach((log) =>
-            {
-                if (!user_total.project_logs.ContainsKey(log.project_id))
-                {
-                    user_total.project_logs[log.project_id] = new List<UserLogEntity>();
-                }
-                if (!user_total.project_logs_summed.ContainsKey(log.project_id))
-                {
-                    user_total.project_logs_summed[log.project_id] = 0;
-                }
-                user_total.project_logs[log.project_id].Add(log);
-                user_total.project_logs_summed[log.project_id] += log.hours_worked;
-            });
-            users_logs_total.Add(user_total);
-        }
-
-        return users_logs_total;
     }
 
     public List<ProjectEntity> GetAllProjects()

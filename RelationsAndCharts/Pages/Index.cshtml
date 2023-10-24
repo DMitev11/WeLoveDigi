@@ -1,94 +1,308 @@
 ﻿@page
 @model IndexModel
 @{
-    ViewData["Title"] = "Visualization Page"; 
-}    
- <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
- <script type="text/javascript"> 
+    ViewData["Title"] = "Visualization Page";
 
+    var top10_set = Model.Top10UsersSummed;
+    var top10 = Model.Top10Users;
+    var users = Model.Users.ToArray();
+    var projects = Model.Projects;
+    var all_users = Model.Users;
+    foreach (var user in top10_set)
+    {
+        all_users.Add(Model.GetUser(user.UserId));
+    }
+    var comparison = Model.ComparisonView;
+    var comparisonTotal = Model.ComparisonTotalView;
+}
+<style>
+    .wrapper {
+        display: flex;
+        gap: 30px;
+        position: relative;
+        top: 10vh;
+        width: fit-content;
 
-      document.addEventListener("DOMContentLoaded", () => { 
-          var top10_set = {};
-          @foreach (var el in Model.UserLogsSummedSet)
-          { 
-              @:top10_set[@(el.total_hours_worked)] = 2; 
-              //@:top10_set[@(el.user_id)] = @(el.total_hours_worked); 
-          }   
-          //drawChart();
-      })
-      //google.charts.load('current', {'packages':['bar']});
-      //google.charts.setOnLoadCallback(drawChart);
+        .user_table {
+            display: flex;
+            position: relative;
+            width: max-content;
+            justify-content: center;
+            flex-wrap: wrap;
 
-      //function drawChart() {
-      //      console.log(top10_set);
-      //      var data = google.visualization.arrayToDataTable([
-      //        ['Year', 'My Now', 'Work', 'Free Time'],
-      //        ['2014', 1000, 400, 200],
-      //        ['2015', 1170, 460, 250],
-      //        ['2016', 660, 1120, 300],
-      //        ['2017', 1030, 540, 350]
-      //      ]);
+            .button_box {
+                width: 100%;
+                gap: 10px;
+                display: flex;
+                justify-content: space-between;
 
-      //      var options = {
-      //        chart: {
-      //          title: 'Top 10 User Logs', 
-      //        },
-      //        bars: 'vertical' // Required for Material Bar Charts.
-      //      };
+                .form {
+                    width: fit-content;
+                    display: inline-flex;
+                }
+            }
 
-      //      var chart = new google.charts.Bar(document.getElementById('top10_chart'));
-      //      chart.draw(data, google.charts.Bar.convertOptions(options));
-      //}
+            .table_row:hover {
+                background-color: gray;
+            }
 
-    </script>
-<table>
-    <thead>
-        <tr> 
-            <th>First Name</th>
-            <th>Last Name</th>
-            <th>Email</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var user in Model.UsersSet)
-        {
-                    <tr> 
-                        <td>@user.first_name</td>
-                        <td>@user.last_name</td>
-                        <td>@user.email</td>
-                    </tr>
+            .table_row:active {
+                background-color: rgb(209, 205, 205);
+            }
+
+            .table_cell {
+                padding: 5px;
+            }
+
+            .table {
+                width: 100%;
+            }
         }
-    </tbody>
-</table> 
-<form method="post">
-    <input type="radio" 
-        asp-for="IsTop10Summed"
-        value="true"
-        name="IsTop10Summed" />
-        Show Summary  <br>
-    <input type="radio"  
-        asp-for="IsTop10Summed"
-        value="false"
-        name="IsTop10Summed" />
-        Show Per Project 
-</form>
-@if (Model.IsTop10Summed)
-{
-        <p> summed </p>
-}
-else
-{ 
-        <p> total </p>
-}
 
-<div id="top10_chart" style="align: center; width: 700px; height: 300px;"></div>
+        .chart {
+            display: flex;
+            flex-wrap: wrap;
+            max-width: 50vw;
+            width: max-content;
+            align-content: center;
+            justify-content: center;
 
-<form method="post" asp-page-handler="RenegerateTables">
-    <button type="submit">Regenerate</button>
-</form> 
-<form method="post" asp-page-handler="PreviousPage">
-    <button type="submit">PreviousPage</button>
-</form> 
-<form method="post" asp-page-handler="NextPage">
-    <button type="submit">NextPage</button>
-</form> 
+            .navigation {
+                margin: auto;
+                width: 100%;
+                justify-content: center;
+                display: flex;
+                padding-bottom: 20px;
+                gap: 20px;
+            }
+
+            #top10_chart {
+                width: 100%;
+                height: 30vh;
+                display: flex;
+                justify-content: center;
+                flex-wrap: nowrap;
+            }
+
+            .calendar-wrapper {
+                gap: 20px;
+                display: flex;
+            }
+        }
+
+        .compare {
+            position: absolute;
+            bottom: 10%;
+            right: 40vw;
+        }
+
+        .reset_db {
+            position: absolute;
+            bottom: 10%;
+            right: 10%;
+        }
+    }
+</style>
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+<script type="text/javascript">
+    let top10 = @Json.Serialize(top10);
+    let top10_set = @Json.Serialize(top10_set);
+    let users = @Json.Serialize(users);
+    let all_users = @Json.Serialize(all_users);
+    let projects = @Json.Serialize(projects);
+    let comparison = @Json.Serialize(comparison);
+    let comparisonTotal = @Json.Serialize(comparisonTotal);
+    google.charts.load('current', { 'packages': ['bar'] });
+    google.charts.setOnLoadCallback(drawChart);
+
+    function displayTop10Summed() {
+        var data = google.visualization.arrayToDataTable(
+            comparison.userId != null ? [
+                ["", "Hours Worked", { role: "style" }],
+                [all_users.find(user => user.id == comparison.userId)?.email, comparison.totalHoursWorked, 'fill-color: red'],
+                ...top10_set.map((el) => [
+                    all_users.find(user => user.id == el.userId)?.email,
+                    el.totalHoursWorked,
+                    'fill-color: blue'])] :
+                [
+                    ["", "Hours Worked"],
+                    ...top10_set.map((el) => [
+                        all_users.find(user => user.id == el.userId)?.email,
+                        el.totalHoursWorked])
+                ]);
+        var options = {
+            chart: {
+                title: 'Top 10 User Logs',
+            },
+            bars: 'vertical' // Required for Material Bar Charts.
+        };
+
+        var chart = new google.charts.Bar(document.getElementById('top10_chart'));
+        chart.draw(data, google.charts.Bar.convertOptions(options));
+    }
+
+    function displayTop10Overview() {
+        console.log([
+            all_users.find(user => user.id == comparisonTotal.userId)?.email,
+            ...projects.map((project_el) => comparisonTotal.projectLogsSummed[project_el.id])
+        ])
+        var data = google.visualization.arrayToDataTable(
+            comparisonTotal.userId != null ?
+                [
+                    ["First Name", ...projects.map((el) => el.name)],
+                    [
+                        all_users.find(user => user.id == comparisonTotal.userId)?.email,
+                        ...projects.map((project_el) => comparisonTotal.projectLogsSummed[project_el.id])
+                    ],
+                    ...top10.map((el) => [
+                        all_users.find(user => user.id == el.userId)?.email,
+                        ...projects.map((project_el) => el.projectLogsSummed[project_el.id])
+                    ])
+                ] :
+                [
+                    ["First Name", ...projects.map((el) => el.name)],
+                    ...top10.map((el) => [
+                        all_users.find(user => user.id == el.userId)?.email,
+                        ...projects.map((project_el) => el.projectLogsSummed[project_el.id])
+                    ])
+                ]);
+
+        var options = {
+            chart: {
+                title: 'Top 10 User Logs',
+            },
+            bars: 'vertical' // Required for Material Bar Charts.
+        };
+
+        var chart = new google.charts.Bar(document.getElementById('top10_chart'));
+        chart.draw(data, google.charts.Bar.convertOptions(options));
+    }
+
+    function drawChart() {
+        if (isPageSummarized) {
+            displayTop10Summed();
+        } else {
+            displayTop10Overview();
+        }
+    }
+
+    let isPageSummarized = true;
+    document.addEventListener("change", (el) => {
+        if (el.target.id == "top10Summed") isPageSummarized = true;
+        if (el.target.id == "top10Detailed") isPageSummarized = false;
+        drawChart();
+    })
+
+    document.addEventListener("click", (el) => {
+        if (el.target.parentNode.id == 'table_row') {
+            var index = el.target.parentNode.classList[1].slice(6);
+            window.location.href = `@(Url.Page("/"))/?handler=Compare&index=${index}`;
+        }
+    })
+</script>
+<script type="text/javascript">
+    document.addEventListener("input", (event) => {
+        console.log(event.srcElement.id)
+        if (event.srcElement.id == "startDate" ||
+            event.srcElement.id == "endDate") {
+            var start_date = document
+                .querySelector(".calendar-wrapper")
+                .querySelector(".start_date")
+                .querySelector("#startDate");
+            localStorage.setItem("date_start", start_date.value)
+
+            var end_date = document
+                .querySelector(".calendar-wrapper")
+                .querySelector(".end_date")
+                .querySelector("#endDate");
+            localStorage.setItem("date_end", end_date.value)
+
+            if (start_date.value && end_date.value) {
+                window.location.href = `@(Url.Page("/"))/?handler=CalendarDates&date_start=${start_date.value}&date_end=${end_date.value}`;
+            }
+            else if (start_date.value) {
+                window.location.href = `@(Url.Page("/"))/?handler=CalendarDates&date_start=${start_date.value}`;
+            }
+        }
+    });
+
+    document.addEventListener("DOMContentLoaded", () => {
+        var start_date = document
+            .querySelector(".calendar-wrapper")
+            .querySelector(".start_date")
+            .querySelector("#startDate");
+        start_date.value = localStorage.getItem("date_start")
+
+        var end_date = document
+            .querySelector(".calendar-wrapper")
+            .querySelector(".end_date")
+            .querySelector("#endDate");
+        end_date.value = localStorage.getItem("date_end")
+    })
+</script>
+
+<body>
+    <div class="wrapper">
+        <div class="user_table">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th class='table_cell' style="display: none;">Id</th>
+                        <th class='table_cell'>First Name</th>
+                        <th class='table_cell'>Last Name</th>
+                        <th class='table_cell'>Email</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{
+                        int i = 0;
+                    }
+                    @foreach (var user in @users)
+                    {
+                        <tr class="table_row index_@i" name='@i' id="table_row">
+                            <td class='table_cell' style="display: none;">@user.Id</td>
+                            <td class='table_cell'>@user.FirstName</td>
+                            <td class='table_cell'>@user.LastName</td>
+                            <td class='table_cell'>@user.Email</td>
+                        </tr>
+                        i++;
+                    }
+                </tbody>
+            </table>
+            <div class="button_box">
+                <form class="form" method="post" asp-page-handler="PreviousPage">
+                    <button type="submit">PreviousPage</button>
+                </form>
+                <form class="form" method="post" asp-page-handler="NextPage">
+                    <button type="submit">NextPage</button>
+                </form>
+            </div>
+        </div>
+        <div class="chart">
+            <div id="top10_chart"></div>
+            <div class="navigation">
+                <span>
+                    Show Summary
+                    <input type="radio" name="toggle_top" id="top10Summed" />
+                </span>
+                <span>
+                    <input type="radio" name="toggle_top" id="top10Detailed" />
+                    Show Per Project
+                </span>
+            </div>
+            <div class="calendar-wrapper">
+                <span class="start_date">
+                    <label for="startDate">Start</label>
+                    <input oninput="" id="startDate" class="form-control" type="date" />
+                </span>
+                <span class="end_date">
+                    <label for="endDate">End</label>
+                    <input id="endDate" class="form-control" type="date" />
+                </span>
+            </div>
+        </div>
+        <form class="reset_db" method="post" asp-page-handler="ResetDB">
+            <button type="submit">Reset</button>
+        </form>
+    </div>
+</body>
